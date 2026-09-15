@@ -1,300 +1,345 @@
-# FinPrism: Configurable Financial Analyst Agent
+# 💎 FinPrism: Persona-Configurable Financial Analyst Agent
 
-**FinPrism** is a single, configurable AI agent that switches between **3 financial analyst personas** and **3 market sectors** (Indian Equities: NSE/BSE), backed by a real SQLite database queried exclusively via **MCP (Model Context Protocol)**, with both a Streamlit chat UI and a FastAPI REST endpoint.
+<div align="center">
+
+[![Python](https://img.shields.io/badge/python-3.11+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Protocol](https://img.shields.io/badge/Protocol-MCP%20JSON--RPC-blueviolet.svg?style=flat)](https://modelcontextprotocol.io)
+[![Market](https://img.shields.io/badge/Equities-NSE%20%2F%20BSE%20(India)-orange.svg?style=flat)](https://www.nseindia.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
+
+**Multi-lens AI equity research agent backed by Model Context Protocol (MCP) and Indian Market Fundamentals.**
+
+[Quick Start](#-quick-start) •
+[Architecture](#-architecture) •
+[Personas](#-analyst-personas) •
+[Sectors & Universe](#-sectors-and-universe-indian-equities) •
+[API Docs](#-api-reference) •
+[Design Write-Up](#-design-notes-assignment-write-up) •
+[Evaluation](#-evaluation--verification)
+
+</div>
 
 ---
 
-## Quick Start
+## 📌 Overview
 
-### 1. Clone and install dependencies
+**FinPrism** is a production-grade, persona-configurable financial analyst agent that dynamically shifts its reasoning lens across **3 investment personas** and **3 industry sectors** in the Indian equity universe (NSE/BSE). 
+
+Unlike typical wrapper agents that bundle hardcoded facts into prompts or query LLMs with open-ended web browsing, FinPrism enforces a **strict architectural boundary via Model Context Protocol (MCP)**:
+- Reasoning is grounded strictly in a 4-table normalized SQLite database.
+- Database access occurs exclusively across a subprocess stdio JSON-RPC protocol.
+- Answers are accompanied by machine-readable metadata (referenced tickers, confidence scores, reasoning lenses, and auditable tool-call logs).
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone & Set Up Environment
 
 ```bash
-git clone <your-repo-url>
-cd configureable-agent
+git clone https://github.com/AnkithGoje/FinPrism.git
+cd FinPrism
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-### 2. Set up environment variables
+### 2. Configure API Keys
 
 ```bash
 cp .env.example .env
-# Edit .env and add your API key (Poolside, Groq, or OpenAI)
 ```
 
-**Supported LLM Providers:**
-- **Poolside AI (Primary)**: Set `POOLSIDE_API_KEY`, `POOLSIDE_BASE_URL` (optional), and `POOLSIDE_MODEL`.
-- **Groq (Secondary / High-Speed)**: Set `GROQ_API_KEY` (default model: `llama-3.3-70b-versatile`).
-- **xAI / OpenAI (Fallback)**: Set `XAI_API_KEY` or `OPENAI_API_KEY`.
+Edit `.env` with your preferred model provider:
 
-### 3. Build the database
+```ini
+# --- Primary Option: Poolside AI ---
+POOLSIDE_API_KEY=your_poolside_api_key_here
+POOLSIDE_BASE_URL=https://api.poolside.ai/v1
+POOLSIDE_MODEL=poolside-model-name
+
+# --- Secondary Option: Groq (High-Speed Llama 3.3 70B) ---
+GROQ_API_KEY=gsk_your_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# --- Fallback: OpenAI / xAI ---
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### 3. Build & Seed SQLite Database
 
 ```bash
 python db/build_db.py
 ```
 
-Expected output:
-```
+Expected verification output:
+```text
 Building financial_agent.db...
 Schema applied: db/schema.sql
 Sector metadata loaded.
-
-Loading sector: tech
-  Companies loaded: tech (12 rows)
-  Financials loaded: tech
-  News signals loaded: tech
-...
+Loading sector: tech (12 companies, 24 financials, 12 news records)
+Loading sector: retail (12 companies, 24 financials, 12 news records)
+Loading sector: manufacturing (12 companies, 24 financials, 12 news records)
 
 === Database Verification ===
   companies: 36 rows
   financials: 72 rows
-  news_signals: ~49 rows
+  news_signals: 36 rows
   sector_meta: 3 rows
-
 ✅ Database build complete!
 ```
 
-### 4a. Run the Streamlit UI
+### 4. Launch User Interfaces
 
+#### Streamlit Web App (Interactive Dashboard)
 ```bash
 streamlit run ui/streamlit_app.py
 ```
+Open **`http://localhost:8501`** to interact with persona selectors, sample Indian equity queries, and the expandable **🔧 MCP Tool Calls** panel.
 
-Opens at `http://localhost:8501`. Select persona + sector in the sidebar, then chat.
-
-### 4b. Run the REST API
-
+#### FastAPI REST Server (Headless API)
 ```bash
 uvicorn api.main:app --reload --port 8000
 ```
-
-Interactive API docs at `http://localhost:8000/docs`
+Interactive OpenAPI documentation is available at **`http://localhost:8000/docs`**.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                          User Presentation Layer                       │
+│      ┌─────────────────────────┐      ┌─────────────────────────┐      │
+│      │   Streamlit Web App     │      │   FastAPI REST API      │      │
+│      │  (ui/streamlit_app.py)  │      │      (api/main.py)      │      │
+│      └────────────┬────────────┘      └────────────┬────────────┘      │
+└───────────────────│────────────────────────────────│───────────────────┘
+                    └────────────────┬───────────────┘
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        FinPrism Agent Core Layer                       │
+│                          (agent/agent.py)                              │
+│  • Compiles persona prompt from agent/personas.py                      │
+│  • Enforces currency conventions (₹ Crores) & reasoning guardrails    │
+│  • Executes multi-turn tool-calling loop with tool_choice="required"   │
+│  • Parses structured AgentResponse payload                             │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ Model Context Protocol (stdio)
+                                     │ JSON-RPC 2.0 Client/Server
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                     MCP Server (mcp_server/server.py)                  │
+│  Exposes 5 scoped semantic tools:                                      │
+│  ├── get_sector_summary(sector)                                        │
+│  ├── list_companies(sector)                                            │
+│  ├── get_company_financials(company_name, sector)                      │
+│  ├── search_companies(query, sector)                                   │
+│  └── get_news_signals(company_name, sector)                            │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ Parameterized SQL Queries
+                                     │ (mcp_server/db_queries.py)
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                     SQLite Database (db/financial_agent.db)            │
+│  • companies (36 Indian equities)    • financials (FY23–FY24 metrics)  │
+│  • news_signals (36 event signals)   • sector_meta (Nifty benchmarks)  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
-┌─────────────────────────────────────────────────┐
-│                  User Interfaces                  │
-│  ┌──────────────────┐    ┌──────────────────┐   │
-│  │   Streamlit UI   │    │   FastAPI REST   │   │
-│  │ (persona/sector  │    │  POST /query     │   │
-│  │  dropdowns, chat)│    │  → JSON response │   │
-│  └────────┬─────────┘    └────────┬─────────┘   │
-└───────────│──────────────────────│──────────────┘
-            └───────────┬──────────┘
-                        ▼
-┌─────────────────────────────────────────────────┐
-│              Agent Core (agent/agent.py)          │
-│  • Builds system prompt from persona config      │
-│  • Runs OpenAI GPT-4o tool-calling loop          │
-│  • Returns structured AgentResponse              │
-└────────────────────┬────────────────────────────┘
-                     │ MCP JSON-RPC (stdio)
-                     ▼
-┌─────────────────────────────────────────────────┐
-│            MCP Server (mcp_server/server.py)     │
-│  Tools: get_sector_summary, list_companies,      │
-│         get_company_financials, search_companies,│
-│         get_news_signals                         │
-└────────────────────┬────────────────────────────┘
-                     │ SQLite queries
-                     ▼
-┌─────────────────────────────────────────────────┐
-│           db/financial_agent.db (SQLite)         │
-│  36 companies × 3 sectors, FY2022–2024           │
-└─────────────────────────────────────────────────┘
-```
 
 ---
 
-## Personas
+## 🎭 Analyst Personas
 
-| Persona ID | Display Name | Analytical Lens |
-|-----------|-------------|-----------------|
-| `mutual_fund_analyst` | Mutual Fund Analyst | Long-only, benchmark-relative, growth durability, valuation vs. index |
-| `equity_analyst` | Equity Analyst | Earnings trends, margin trajectory, P/E and EV/EBITDA multiples |
-| `pe_analyst` | PE Analyst | Leverage capacity, EBITDA margin upside, EV/EBITDA entry/exit, IRR scenarios |
+Each persona enforces distinct analytical priorities, valuation methods, and return hurdles:
 
-The same question asked with different personas produces meaningfully different answers — different framing, different metrics emphasized, different conclusions.
-
----
-
-## Sectors (Indian Equity Universe)
-
-| Sector ID | Companies (NSE Tickers) | Benchmark |
-|-----------|-------------------------|-----------|
-| `tech` | TCS, Infosys (INFY), HCLTech (HCLTECH), Wipro (WIPRO), Tech Mahindra (TECHM), LTIMindtree (LTIM), Persistent Systems (PERSISTENT), Coforge (COFORGE), Mphasis (MPHASIS), Tata Elxsi (TATAELXSI), KPIT Technologies (KPITTECH), Zensar Technologies (ZENSARTECH) | Nifty IT Index |
-| `retail` | Avenue Supermarts (DMART), Trent (TRENT), Titan (TITAN), Reliance Retail proxy (RELIANCE), Aditya Birla Fashion (ABFRL), Shoppers Stop (SHOPERSTOP), V-Mart (VMART), Metro Brands (METROBRAND), Vedant Fashions (MANYAVAR), Nykaa (NYKAA), Devyani International (DEVYANI), Spencer's (SPENCERS) | Nifty India Consumption Index |
-| `manufacturing` | Larsen & Toubro (LT), Tata Motors (TATAMOTORS), Mahindra & Mahindra (M&M), Bharat Electronics (BEL), Hindustan Aeronautics (HAL), Cummins India (CUMMINSIND), Siemens India (SIEMENS), ABB India (ABB), Bharat Forge (BHARATFORG), Thermax (THERMAX), Dixon Tech (DIXON), AIA Engineering (AIAENG) | Nifty India Manufacturing Index |
+| Persona ID | Role | Core Analytical Focus | Valuation & Metrics Lens |
+|---|---|---|---|
+| `mutual_fund_analyst` | **Mutual Fund Analyst** | Benchmark-relative outperformance, portfolio risk, compounders | Relative valuation vs Nifty Sectoral Indices, revenue CAGR, ROE persistence |
+| `equity_analyst` | **Sell-Side Equity Analyst** | Fundamental valuation, quarterly margin trajectory, price catalysts | P/E multiples, EV/EBITDA, margin expansion/compression, rating calls |
+| `pe_analyst` | **Private Equity Associate** | Buyout viability, balance sheet deleveraging, operational turnarounds | Free cash flow conversion, debt-to-equity capacity, multiple arbitrage, IRR |
 
 ---
 
-## API Reference
+## 📊 Sectors and Universe (Indian Equities)
+
+The database covers **36 actively traded large- and mid-cap Indian companies** across 3 primary sectors:
+
+### 1. Technology (IT Services & Solutions)
+- **Benchmark**: Nifty IT Index
+- **Constituents (12)**: TCS, Infosys (`INFY`), HCLTech (`HCLTECH`), Wipro (`WIPRO`), Tech Mahindra (`TECHM`), LTIMindtree (`LTIM`), Persistent Systems (`PERSISTENT`), Coforge (`COFORGE`), Mphasis (`MPHASIS`), Tata Elxsi (`TATAELXSI`), KPIT Technologies (`KPITTECH`), Zensar Technologies (`ZENSARTECH`).
+
+### 2. Consumer Retail & Discretionary
+- **Benchmark**: Nifty India Consumption Index
+- **Constituents (12)**: Avenue Supermarts / DMart (`DMART`), Trent (`TRENT`), Titan (`TITAN`), Reliance Retail Proxy (`RELIANCE`), Aditya Birla Fashion (`ABFRL`), Shoppers Stop (`SHOPERSTOP`), V-Mart (`VMART`), Metro Brands (`METROBRAND`), Vedant Fashions (`MANYAVAR`), Nykaa (`NYKAA`), Devyani International (`DEVYANI`), Spencer's Retail (`SPENCERS`).
+
+### 3. Industrials & Capital Goods
+- **Benchmark**: Nifty India Manufacturing Index
+- **Constituents (12)**: Larsen & Toubro (`LT`), Tata Motors (`TATAMOTORS`), Mahindra & Mahindra (`M&M`), Bharat Electronics (`BEL`), Hindustan Aeronautics (`HAL`), Cummins India (`CUMMINSIND`), Siemens India (`SIEMENS`), ABB India (`ABB`), Bharat Forge (`BHARATFORG`), Thermax (`THERMAX`), Dixon Technologies (`DIXON`), AIA Engineering (`AIAENG`).
+
+---
+
+## 🔌 API Reference
 
 ### `POST /query`
+Executes an analysis for a specified persona, sector, and analytical query.
 
+#### Request
 ```bash
 curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "Which companies look like attractive buyout targets?",
+    "query": "Which companies have the strongest EBITDA margins and cash conversion?",
     "persona": "pe_analyst",
     "sector": "manufacturing"
   }'
 ```
 
-Response:
+#### Response
 ```json
 {
-  "query": "Which companies look like attractive buyout targets?",
+  "query": "Which companies have the strongest EBITDA margins and cash conversion?",
   "persona": "pe_analyst",
   "persona_display": "PE Analyst",
   "sector": "manufacturing",
   "sector_display": "Manufacturing",
-  "answer": "Based on the data in the database...",
-  "reasoning_lens": "PE deal lens: leverage capacity, EBITDA improvement, EV/EBITDA entry/exit",
-  "companies_referenced": ["Cummins India", "AIA Engineering"],
+  "answer": "Based on the FY24 financial data in the database, Cummins India and AIA Engineering demonstrate the strongest margin and cash conversion profiles...",
+  "reasoning_lens": "PE deal lens: leverage capacity, EBITDA improvement, EV/EBITDA entry/exit, IRR scenarios",
+  "companies_referenced": ["Cummins India", "AIA Engineering", "Larsen & Toubro"],
   "tool_calls_made": [
-    {"tool_name": "get_sector_summary", "arguments": {"sector": "manufacturing"}, "result_summary": "OK"},
-    {"tool_name": "list_companies", "arguments": {"sector": "manufacturing"}, "result_summary": "Returned 12 items"}
+    {
+      "tool_name": "get_sector_summary",
+      "arguments": {"sector": "manufacturing"},
+      "result_summary": "Sector: manufacturing, Avg P/E: 52.8"
+    },
+    {
+      "tool_name": "list_companies",
+      "arguments": {"sector": "manufacturing"},
+      "result_summary": "Returned 12 companies"
+    },
+    {
+      "tool_name": "get_company_financials",
+      "arguments": {"company_name": "Cummins India", "sector": "manufacturing"},
+      "result_summary": "Returned 2 financial records for Cummins India"
+    }
   ],
   "confidence": "high",
-  "data_coverage_note": "",
-  "caveats": "Data sourced from public filings as of mid-2024. Not investment advice."
+  "data_coverage_note": "FY23 and FY24 reported figures verified.",
+  "caveats": "Data sourced from public BSE/NSE filings as of FY24. All figures in INR Crores unless specified."
 }
 ```
 
-### Other endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/personas` | List all personas |
-| `GET` | `/sectors` | List all sectors |
-| `GET` | `/docs` | Swagger UI |
+### Additional Endpoints
+- `GET /health`: Health and service availability status.
+- `GET /personas`: Lists available analyst personas and descriptions.
+- `GET /sectors`: Lists supported sectors, ticker coverage, and benchmark indices.
+- `GET /docs`: Interactive Swagger UI.
 
 ---
 
-## Project Structure
+## 📁 Repository Structure
 
-```
-configureable-agent/
-├── README.md
-├── .env.example
-├── requirements.txt
+```text
+FinPrism/
+├── .env.example              # Sample environment configuration
+├── .gitignore                # Git ignore patterns (DB, keys, caches)
+├── requirements.txt          # Production dependencies
+├── README.md                 # Project documentation and assignment write-up
 │
-├── db/
-│   ├── schema.sql              # DDL for all 4 tables
-│   ├── build_db.py             # Builds SQLite from seed CSVs
-│   ├── financial_agent.db      # SQLite DB (built by build_db.py)
-│   └── seed_data/
-│       ├── tech_companies.csv
-│       ├── tech_financials.csv
-│       ├── tech_news.csv
-│       ├── retail_companies.csv
-│       ├── retail_financials.csv
-│       ├── retail_news.csv
-│       ├── manufacturing_companies.csv
-│       ├── manufacturing_financials.csv
-│       └── manufacturing_news.csv
+├── agent/                    # Core Agent Logic
+│   ├── agent.py              # LLM tool-calling loop and provider resolution
+│   ├── personas.py           # Persona prompt definitions and sector metadata
+│   ├── mcp_client.py         # Subprocess stdio JSON-RPC MCP client
+│   └── schemas.py            # Pydantic request and response models
 │
-├── mcp_server/
-│   ├── server.py               # MCP stdio server (5 tools exposed)
-│   └── db_queries.py           # SQLite queries (only used by MCP server)
+├── mcp_server/               # Model Context Protocol Server
+│   ├── server.py             # Official MCP server exposing 5 analytical tools
+│   └── db_queries.py         # Parameterized SQLite query implementations
 │
-├── agent/
-│   ├── agent.py                # Core LLM tool-calling loop
-│   ├── personas.py             # Persona configs + system prompt builder
-│   ├── mcp_client.py           # Subprocess MCP client
-│   └── schemas.py              # Pydantic request/response models
+├── db/                       # Database Construction & Seeding
+│   ├── schema.sql            # DDL for 4 normalized SQLite tables
+│   ├── build_db.py           # Python ETL pipeline for seeding database
+│   ├── financial_agent.db    # SQLite database (generated)
+│   └── seed_data/            # Sourced CSVs (Companies, Financials, Signals)
+│       ├── tech_*.csv
+│       ├── retail_*.csv
+│       └── manufacturing_*.csv
 │
-├── api/
-│   └── main.py                 # FastAPI REST API
+├── api/                      # REST API Layer
+│   └── main.py               # FastAPI application endpoints and CORS setup
 │
-├── ui/
-│   └── streamlit_app.py        # Streamlit chat interface
+├── ui/                       # Web Dashboard
+│   └── streamlit_app.py      # Streamlit multi-lens chat application
 │
-└── docs/
-    └── schema_decisions.md     # Data sourcing + design notes
+├── docs/                     # Additional Documentation
+│   └── schema_decisions.md   # Architectural design choices
+│
+└── tests/                    # Verification & Sanity Checks
+    └── test_evaluation_queries.py # Pytest test suite for personas & MCP
 ```
 
 ---
 
-## Design Notes (Assignment Write-Up)
+## 📝 Design Notes (Assignment Write-Up)
 
 ### 1. Schema Decisions
-The database uses a 4-table normalized SQLite schema designed to give the agent structured, multi-dimensional grounding without prompt hardcoding:
-* **`companies`**: Master record of static company attributes (name, ticker, sector, employee headcount, headquarters, founding year, business description). Normalized to eliminate redundant string storage across reporting periods.
-* **`financials`**: Multi-year time-series financial statements (FY2022–FY2024) including Revenue, EBITDA, Net Income, Gross/EBITDA margins, P/E, EV/EBITDA, Debt/Equity, ROE, and Free Cash Flow. Storing multi-year data allows the Equity Analyst to analyze margin trajectories and the PE Analyst to model historical cash conversion.
-* **`sector_meta`**: Sector-level benchmark indices (e.g., NASDAQ-100 for Tech, XLI for Manufacturing) and peer averages (avg P/E, avg EV/EBITDA). This is fetched dynamically via MCP at the start of every query and interpolated into the system prompt, guaranteeing that benchmark references reflect the DB rather than model hallucinations.
-* **`news_signals`**: Event-driven signals categorized by type (`hiring`, `layoffs`, `expansion`, `earnings_beat`, `acquisition`). This directly supports data-grounding stress tests (e.g., headcount and hiring signals).
+The persistence layer uses a 4-table normalized SQLite schema designed to give the agent structured, multi-dimensional grounding without prompt hardcoding:
+* **`companies`**: Master record of static entity attributes (`id`, `name`, `ticker`, `sector`, `employee_count`, `headquarters`, `founding_year`, `business_description`). Normalizing static metadata eliminates redundant string storage across reporting periods.
+* **`financials`**: Multi-year time-series financial statements (`FY2023–FY2024`) containing Revenue, EBITDA, Net Income, Gross/EBITDA margins, P/E, EV/EBITDA, Debt/Equity, ROE, and Free Cash Flow. Multi-year reporting enables the Equity Analyst to examine margin trajectories and the PE Analyst to model cash flow stability.
+* **`sector_meta`**: Sector-level benchmark indices (e.g. *Nifty IT Index*, *Nifty India Consumption Index*, *Nifty India Manufacturing Index*) and sector peer averages. This is retrieved dynamically via MCP at query execution and injected into the prompt, ensuring benchmark comparisons reflect database ground truth.
+* **`news_signals`**: Event-driven signals categorized by type (`hiring`, `expansion`, `order_win`, `earnings_beat`). This directly supports data-grounding stress tests (e.g. headcount changes and strategic wins).
 
-**Key Schema Considerations:**
-* **Unprofitable Companies**: Companies with negative earnings are stored with `pe_ratio = -1.0` (sentinel value) rather than `NULL` or 0, enabling the agent to distinguish between missing data and unprofitable high-growth names.
-* **Integrity Constraints**: DB-level `CHECK(sector IN ('tech', 'retail', 'manufacturing'))` prevents corrupted data entry.
-* **Scope Trade-offs**: Annual data was chosen over quarterly to provide sufficient strategic depth for all three personas while keeping data compilation auditable and transparent.
+**Key Considerations:**
+- **Unprofitable Companies**: Companies with negative earnings are stored with `pe_ratio = -1.0` (sentinel value) rather than `NULL` or 0, enabling the agent to distinguish between missing data and unprofitable growth names.
+- **Indian Market Representation**: All financial figures are denominated in **₹ Crores** (standard Indian corporate reporting standard), with numbers formatted in the Indian numbering system (`₹2,40,890 Cr`).
+- **Integrity Constraints**: DB-level `CHECK(sector IN ('tech', 'retail', 'manufacturing'))` prevents corrupted data entry.
 
 ---
 
 ### 2. MCP Protocol Boundary Design
 Model Context Protocol (MCP) serves as the **strict architectural boundary** between the reasoning agent and data persistence:
-* **Subprocess Stdio Transport**: Rather than importing SQLite queries inline as Python functions, `mcp_server/server.py` runs as an isolated child OS process. The agent communicates strictly over standard input/output using the official `mcp` SDK's JSON-RPC protocol (`StdioServerParameters`, `stdio_client`, `ClientSession`). This guarantees zero code coupling between the agent runtime and the database layer.
+* **Subprocess Stdio Transport**: Rather than importing SQLite queries inline as Python modules, `mcp_server/server.py` runs as an isolated child OS process. The agent communicates strictly over standard input/output using the official `mcp` SDK's JSON-RPC protocol (`StdioServerParameters`, `stdio_client`, `ClientSession`). This guarantees zero code coupling between the agent runtime and the database layer.
 * **Semantic Scoped Tools vs. Generic SQL**:
-  Instead of exposing an open `execute_sql` tool (which invites SQL injection, hallucinated schema queries, and unconstrained table scans), we exposed 5 purpose-built semantic tools:
+  Instead of exposing an open `execute_sql` tool (which risks prompt injection, hallucinated schema queries, and unconstrained table scans), FinPrism exposes 5 purpose-built semantic tools:
   1. `get_sector_summary(sector)` — Macro overview and benchmark multiples.
-  2. `list_companies(sector)` — High-level sector screen.
+  2. `list_companies(sector)` — High-level sector constituent screen.
   3. `get_company_financials(company_name, sector)` — Deep multi-year financial history with explicit `found: false` handling.
   4. `search_companies(query, sector)` — Fuzzy ticker and company name lookup.
   5. `get_news_signals(company_name, sector)` — Recent operational developments and headcount signals.
-* **Single-Session Batching**: Parallel tool requests generated by the LLM are batched within a single MCP session context (`call_tools_batch_sync`), reducing OS subprocess handshakes while preserving strict protocol boundaries.
+* **Single-Session Batching**: Parallel tool requests generated by the LLM are batched within a single MCP session context (`call_tools_batch_sync`), minimizing process spawning overhead.
 * **Auditability & UI Transparency**: All MCP tool calls made during reasoning are recorded in `AgentResponse.tool_calls_made` and displayed in the Streamlit UI's expandable **🔧 MCP Tool Calls** panel.
 
 ---
 
 ### 3. One Thing I'd Improve With More Time
-**Automated Real-Time SEC EDGAR & Market API Ingestion**:
-Currently, the database is compiled from public filings (10-Ks, investor relations disclosures) as of mid-2024. With additional time, I would build an event-driven ingestion pipeline connecting directly to the **SEC EDGAR XBRL API** and **Polygon.io/Financial Modeling Prep**:
-* Automatically ingest quarterly 10-Q filings and 8-K operational updates on release.
-* Implement a vector RAG index over raw earnings call transcripts and 10-K Item 7 (MD&A) sections. This would allow the Mutual Fund and PE analysts to cite verbatim management commentary alongside quantitative balance sheet metrics, marrying structured SQL data with unstructured sentiment.
+**Automated Real-Time Indian Exchange (NSE/BSE) API Ingestion**:
+Currently, the database is seeded from audited annual reports and filings as of FY24. With additional time, I would build an event-driven ingestion pipeline connecting directly to the **NSE/BSE Corporate Filings APIs** and **Screener.in / Trendlyne feeds**:
+* Automatically ingest quarterly results (Q1/Q2/Q3/Q4) and regulatory disclosures on release.
+* Implement a vector RAG index over conference call earnings transcripts and annual report MD&A sections. This would allow the Mutual Fund and PE analysts to cite verbatim management commentary alongside quantitative balance sheet metrics, marrying structured SQL data with unstructured sentiment.
 
 ---
 
-## LLM Configuration
+## 🧪 Evaluation & Verification
 
-The agent uses the OpenAI-compatible API interface and dynamically selects providers configured in `.env`:
-* **Poolside AI (Primary)**: Configure `POOLSIDE_API_KEY`, `POOLSIDE_BASE_URL`, and `POOLSIDE_MODEL`.
-* **Groq (Secondary / High-Speed)**: Configure `GROQ_API_KEY` (defaulting to `llama-3.3-70b-versatile` with native tool-calling).
-* **xAI Grok / OpenAI (Fallback)**: Supports `XAI_API_KEY` (`grok-beta`) or `OPENAI_API_KEY` (`gpt-4o`).
+A dedicated automated test suite validates database integrity, all 9 persona × sector permutations, out-of-scope refusal handling, and data grounding:
 
----
-
-## Data Quality Caveats
-
-- **Time Horizon**: Sourced from public 10-K filings, Yahoo Finance, and company investor relations disclosures as of **mid-2024**.
-- **Negative P/E Sentinel**: P/E ratios listed as `-1.0` designate unprofitable companies with negative net income.
-- **Segment Approximations**: Amazon's retail business is estimated by isolating AWS segment revenue and operating margin from consolidated figures.
-- **Capital Structure Adjustments**: Retailers like Home Depot and Lowe's maintain negative book equity due to extensive historical share repurchases; their Debt/Equity ratios reflect leveraged capital structures rather than insolvency.
-- **Disclaimer**: This software is designed for analytical demonstration purposes and does not constitute formal investment advice.
-
----
-
-## Evaluation & Sanity Checks
-
-Run the automated evaluation suite verifying database integrity, prompt permutations, out-of-scope refusals, and grounding signals:
 ```bash
-python tests/test_evaluation_queries.py
+python -m pytest tests/test_evaluation_queries.py -v
 ```
 
-### Recommended 3–5 Minute Video Walkthrough Outline
-1. **Introduction (30s)**: Overview of the 3 personas, 3 sectors, and SQLite MCP architecture.
-2. **Persona Comparison (90s)**: Ask *"Is this sector a good place to be putting money to work right now?"* in Tech under **Mutual Fund Analyst** (benchmark-relative, index weight) vs. **PE Analyst** (entry EV/EBITDA, leverage capacity, exit horizons).
+### Video Walkthrough Recommended Outline (3–5 Minutes)
+1. **Introduction (30s)**: High-level overview of FinPrism, the 3 personas, 3 Indian equity sectors, and the MCP stdio protocol boundary.
+2. **Persona Comparison (90s)**: Ask *"Which companies here look like the most attractive target?"* in Manufacturing under **Mutual Fund Analyst** (benchmark-relative, quality compounding) vs. **PE Analyst** (entry EV/EBITDA, leverage capacity, FCF).
 3. **MCP Tool Transparency (45s)**: Expand the **🔧 MCP Tool Calls** panel in Streamlit to show live JSON-RPC tool invocations.
 4. **Data Grounding & Anti-Hallucination (45s)**:
-   - Ask for NVIDIA's headcount signal to show real database retrieval.
-   - Ask about an unlisted company (e.g. *"What do you think about Tesla?"*) to show honest refusal without hallucination.
-5. **REST API (30s)**: Submit a `curl` query to `POST /query` showing structured JSON with `companies_referenced`, `confidence`, and `reasoning_lens`.
-#   F i n P r i s m  
- 
+   - Ask for TCS or Tata Motors headcount and expansion signals to verify real DB retrieval.
+   - Ask about an unlisted entity (e.g. *"What do you think about Tesla?"*) to demonstrate graceful refusal without hallucination.
+5. **REST API (30s)**: Issue a `curl` request to `POST /query` demonstrating programmatic consumption with structured JSON.

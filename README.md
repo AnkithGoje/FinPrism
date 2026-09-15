@@ -334,12 +334,3 @@ A dedicated automated test suite validates database integrity, all 9 persona × 
 ```bash
 python -m pytest tests/test_evaluation_queries.py -v
 ```
-
-### Video Walkthrough Recommended Outline (3–5 Minutes)
-1. **Introduction (30s)**: High-level overview of FinPrism, the 3 personas, 3 Indian equity sectors, and the MCP stdio protocol boundary.
-2. **Persona Comparison (90s)**: Ask *"Which companies here look like the most attractive target?"* in Manufacturing under **Mutual Fund Analyst** (benchmark-relative, quality compounding) vs. **PE Analyst** (entry EV/EBITDA, leverage capacity, FCF).
-3. **MCP Tool Transparency (45s)**: Expand the **🔧 MCP Tool Calls** panel in Streamlit to show live JSON-RPC tool invocations.
-4. **Data Grounding & Anti-Hallucination (45s)**:
-   - Ask for TCS or Tata Motors headcount and expansion signals to verify real DB retrieval.
-   - Ask about an unlisted entity (e.g. *"What do you think about Tesla?"*) to demonstrate graceful refusal without hallucination.
-5. **REST API (30s)**: Issue a `curl` request to `POST /query` demonstrating programmatic consumption with structured JSON.

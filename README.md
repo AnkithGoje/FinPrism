@@ -1,86 +1,74 @@
-# 💎 FinPrism: Persona-Configurable Financial Analyst Agent
-
-<div align="center">
-
+# FinPrism: Persona-Configurable Financial Analyst Agent
+ 
 [![Python](https://img.shields.io/badge/python-3.11+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Protocol](https://img.shields.io/badge/Protocol-MCP%20JSON--RPC-blueviolet.svg?style=flat)](https://modelcontextprotocol.io)
 [![Market](https://img.shields.io/badge/Equities-NSE%20%2F%20BSE%20(India)-orange.svg?style=flat)](https://www.nseindia.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
-
-**Multi-lens AI equity research agent backed by Model Context Protocol (MCP) and Indian Market Fundamentals.**
-
-[Quick Start](#-quick-start) •
-[Architecture](#-architecture) •
-[Personas](#-analyst-personas) •
-[Sectors & Universe](#-sectors-and-universe-indian-equities) •
-[API Docs](#-api-reference) •
-[Design Write-Up](#-design-notes-assignment-write-up) •
-[Evaluation](#-evaluation--verification)
-
-</div>
-
+ 
+An equity research agent that switches between three investment personas and three sectors of the Indian market (NSE/BSE), grounded entirely in a local SQLite database through the Model Context Protocol.
+ 
+[Quick Start](#quick-start) • [Architecture](#architecture) • [Personas](#analyst-personas) • [Sectors](#sectors-and-universe-indian-equities) • [API Docs](#api-reference) • [Design Notes](#design-notes-assignment-write-up) • [Evaluation](#evaluation-and-verification)
+ 
 ---
-
-## 📌 Overview
-
-**FinPrism** is a production-grade, persona-configurable financial analyst agent that dynamically shifts its reasoning lens across **3 investment personas** and **3 industry sectors** in the Indian equity universe (NSE/BSE). 
-
-Unlike typical wrapper agents that bundle hardcoded facts into prompts or query LLMs with open-ended web browsing, FinPrism enforces a **strict architectural boundary via Model Context Protocol (MCP)**:
-- Reasoning is grounded strictly in a 4-table normalized SQLite database.
-- Database access occurs exclusively across a subprocess stdio JSON-RPC protocol.
-- Answers are accompanied by machine-readable metadata (referenced tickers, confidence scores, reasoning lenses, and auditable tool-call logs).
-
+ 
+## Overview
+ 
+FinPrism is a financial analyst agent that answers questions about Indian equities from the perspective of three different roles: a mutual fund analyst, a sell-side equity analyst, and a private equity associate. Each persona reasons differently about the same underlying data, so the same question can produce very different answers depending on who's "asking."
+ 
+Most agent demos let the model pull facts from wherever it wants, whether that's a hardcoded prompt or an open web search. FinPrism doesn't do that. Every answer has to come from a 4-table SQLite database, and the agent can only reach that database through a subprocess running over stdio JSON-RPC, using the Model Context Protocol. Every tool call the agent makes gets logged, along with a confidence score and the tickers it referenced, so you can see exactly where an answer came from.
+ 
 ---
-
-## 🚀 Quick Start
-
-### 1. Clone & Set Up Environment
-
+ 
+## Quick Start
+ 
+### 1. Clone the repo and set up your environment
+ 
 ```bash
 git clone https://github.com/AnkithGoje/FinPrism.git
 cd FinPrism
 python -m venv venv
-
+ 
 # Windows
 venv\Scripts\activate
-
+ 
 # macOS / Linux
 source venv/bin/activate
-
+ 
 pip install -r requirements.txt
 ```
-
-### 2. Configure API Keys
-
+ 
+### 2. Add your API keys
+ 
 ```bash
 cp .env.example .env
 ```
-
-Edit `.env` with your preferred model provider:
-
+ 
+Then edit `.env` with whichever model provider you're using:
+ 
 ```ini
 # --- Primary Option: Poolside AI ---
 POOLSIDE_API_KEY=your_poolside_api_key_here
 POOLSIDE_BASE_URL=https://api.poolside.ai/v1
 POOLSIDE_MODEL=poolside-model-name
-
+ 
 # --- Secondary Option: Groq (High-Speed Llama 3.3 70B) ---
 GROQ_API_KEY=gsk_your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
-
+ 
 # --- Fallback: OpenAI / xAI ---
 OPENAI_API_KEY=your_openai_api_key_here
 ```
-
-### 3. Build & Seed SQLite Database
-
+ 
+### 3. Build and seed the database
+ 
 ```bash
 python db/build_db.py
 ```
-
-Expected verification output:
+ 
+You should see something like this:
+ 
 ```text
 Building financial_agent.db...
 Schema applied: db/schema.sql
@@ -88,33 +76,37 @@ Sector metadata loaded.
 Loading sector: tech (12 companies, 24 financials, 12 news records)
 Loading sector: retail (12 companies, 24 financials, 12 news records)
 Loading sector: manufacturing (12 companies, 24 financials, 12 news records)
-
+ 
 === Database Verification ===
   companies: 36 rows
   financials: 72 rows
   news_signals: 36 rows
   sector_meta: 3 rows
-✅ Database build complete!
+Database build complete!
 ```
-
-### 4. Launch User Interfaces
-
-#### Streamlit Web App (Interactive Dashboard)
+ 
+### 4. Launch a UI
+ 
+**Streamlit dashboard**
+ 
 ```bash
 streamlit run ui/streamlit_app.py
 ```
-Open **`http://localhost:8501`** to interact with persona selectors, sample Indian equity queries, and the expandable **🔧 MCP Tool Calls** panel.
-
-#### FastAPI REST Server (Headless API)
+ 
+Go to `http://localhost:8501` to pick a persona, try sample queries, and expand the MCP Tool Calls panel to see what the agent looked up.
+ 
+**FastAPI server**
+ 
 ```bash
 uvicorn api.main:app --reload --port 8000
 ```
-Interactive OpenAPI documentation is available at **`http://localhost:8000/docs`**.
-
+ 
+Swagger docs are at `http://localhost:8000/docs`.
+ 
 ---
-
-## 🏗️ Architecture
-
+ 
+## Architecture
+ 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                          User Presentation Layer                       │
@@ -128,17 +120,17 @@ Interactive OpenAPI documentation is available at **`http://localhost:8000/docs`
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        FinPrism Agent Core Layer                       │
 │                          (agent/agent.py)                              │
-│  • Compiles persona prompt from agent/personas.py                      │
-│  • Enforces currency conventions (₹ Crores) & reasoning guardrails    │
-│  • Executes multi-turn tool-calling loop with tool_choice="required"   │
-│  • Parses structured AgentResponse payload                             │
+│  • Builds the persona prompt from agent/personas.py                    │
+│  • Enforces currency conventions (₹ Crores) and reasoning guardrails   │
+│  • Runs a multi-turn tool-calling loop with tool_choice="required"     │
+│  • Parses the structured AgentResponse payload                         │
 └────────────────────────────────────┬───────────────────────────────────┘
                                      │ Model Context Protocol (stdio)
                                      │ JSON-RPC 2.0 Client/Server
                                      ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                     MCP Server (mcp_server/server.py)                  │
-│  Exposes 5 scoped semantic tools:                                      │
+│  Exposes 5 scoped tools:                                                │
 │  ├── get_sector_summary(sector)                                        │
 │  ├── list_companies(sector)                                            │
 │  ├── get_company_financials(company_name, sector)                      │
@@ -154,45 +146,44 @@ Interactive OpenAPI documentation is available at **`http://localhost:8000/docs`
 │  • news_signals (36 event signals)   • sector_meta (Nifty benchmarks)  │
 └────────────────────────────────────────────────────────────────────────┘
 ```
-
+ 
 ---
-
-## 🎭 Analyst Personas
-
-Each persona enforces distinct analytical priorities, valuation methods, and return hurdles:
-
-| Persona ID | Role | Core Analytical Focus | Valuation & Metrics Lens |
+ 
+## Analyst Personas
+ 
+Each persona looks at the same data with a different job in mind, so the valuation lens and the metrics it leans on change accordingly.
+ 
+| Persona ID | Role | What it cares about | How it values things |
 |---|---|---|---|
-| `mutual_fund_analyst` | **Mutual Fund Analyst** | Benchmark-relative outperformance, portfolio risk, compounders | Relative valuation vs Nifty Sectoral Indices, revenue CAGR, ROE persistence |
-| `equity_analyst` | **Sell-Side Equity Analyst** | Fundamental valuation, quarterly margin trajectory, price catalysts | P/E multiples, EV/EBITDA, margin expansion/compression, rating calls |
-| `pe_analyst` | **Private Equity Associate** | Buyout viability, balance sheet deleveraging, operational turnarounds | Free cash flow conversion, debt-to-equity capacity, multiple arbitrage, IRR |
-
+| `mutual_fund_analyst` | Mutual Fund Analyst | Beating the benchmark, portfolio risk, finding compounders | Valuation relative to Nifty sectoral indices, revenue CAGR, how consistent ROE has been |
+| `equity_analyst` | Sell-Side Equity Analyst | Fundamental valuation, quarterly margin trends, what could move the stock | P/E, EV/EBITDA, margin expansion or compression, rating calls |
+| `pe_analyst` | Private Equity Associate | Whether a buyout makes sense, deleveraging, operational turnarounds | Free cash flow conversion, how much debt the balance sheet can carry, multiple arbitrage, IRR |
+ 
 ---
-
-## 📊 Sectors and Universe (Indian Equities)
-
-The database covers **36 actively traded large- and mid-cap Indian companies** across 3 primary sectors:
-
+ 
+## Sectors and Universe (Indian Equities)
+ 
+The database covers 36 large and mid-cap Indian companies across three sectors.
+ 
 ### 1. Technology (IT Services & Solutions)
-- **Benchmark**: Nifty IT Index
-- **Constituents (12)**: TCS, Infosys (`INFY`), HCLTech (`HCLTECH`), Wipro (`WIPRO`), Tech Mahindra (`TECHM`), LTIMindtree (`LTIM`), Persistent Systems (`PERSISTENT`), Coforge (`COFORGE`), Mphasis (`MPHASIS`), Tata Elxsi (`TATAELXSI`), KPIT Technologies (`KPITTECH`), Zensar Technologies (`ZENSARTECH`).
-
+Benchmarked against the Nifty IT Index. Covers TCS, Infosys (`INFY`), HCLTech (`HCLTECH`), Wipro (`WIPRO`), Tech Mahindra (`TECHM`), LTIMindtree (`LTIM`), Persistent Systems (`PERSISTENT`), Coforge (`COFORGE`), Mphasis (`MPHASIS`), Tata Elxsi (`TATAELXSI`), KPIT Technologies (`KPITTECH`), and Zensar Technologies (`ZENSARTECH`).
+ 
 ### 2. Consumer Retail & Discretionary
-- **Benchmark**: Nifty India Consumption Index
-- **Constituents (12)**: Avenue Supermarts / DMart (`DMART`), Trent (`TRENT`), Titan (`TITAN`), Reliance Retail Proxy (`RELIANCE`), Aditya Birla Fashion (`ABFRL`), Shoppers Stop (`SHOPERSTOP`), V-Mart (`VMART`), Metro Brands (`METROBRAND`), Vedant Fashions (`MANYAVAR`), Nykaa (`NYKAA`), Devyani International (`DEVYANI`), Spencer's Retail (`SPENCERS`).
-
+Benchmarked against the Nifty India Consumption Index. Covers DMart (`DMART`), Trent (`TRENT`), Titan (`TITAN`), Reliance Retail Proxy (`RELIANCE`), Aditya Birla Fashion (`ABFRL`), Shoppers Stop (`SHOPERSTOP`), V-Mart (`VMART`), Metro Brands (`METROBRAND`), Vedant Fashions (`MANYAVAR`), Nykaa (`NYKAA`), Devyani International (`DEVYANI`), and Spencer's Retail (`SPENCERS`).
+ 
 ### 3. Industrials & Capital Goods
-- **Benchmark**: Nifty India Manufacturing Index
-- **Constituents (12)**: Larsen & Toubro (`LT`), Tata Motors (`TATAMOTORS`), Mahindra & Mahindra (`M&M`), Bharat Electronics (`BEL`), Hindustan Aeronautics (`HAL`), Cummins India (`CUMMINSIND`), Siemens India (`SIEMENS`), ABB India (`ABB`), Bharat Forge (`BHARATFORG`), Thermax (`THERMAX`), Dixon Technologies (`DIXON`), AIA Engineering (`AIAENG`).
-
+Benchmarked against the Nifty India Manufacturing Index. Covers Larsen & Toubro (`LT`), Tata Motors (`TATAMOTORS`), Mahindra & Mahindra (`M&M`), Bharat Electronics (`BEL`), Hindustan Aeronautics (`HAL`), Cummins India (`CUMMINSIND`), Siemens India (`SIEMENS`), ABB India (`ABB`), Bharat Forge (`BHARATFORG`), Thermax (`THERMAX`), Dixon Technologies (`DIXON`), and AIA Engineering (`AIAENG`).
+ 
 ---
-
-## 🔌 API Reference
-
+ 
+## API Reference
+ 
 ### `POST /query`
-Executes an analysis for a specified persona, sector, and analytical query.
-
-#### Request
+ 
+Runs an analysis for a given persona, sector, and question.
+ 
+**Request**
+ 
 ```bash
 curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
@@ -202,8 +193,9 @@ curl -X POST http://localhost:8000/query \
     "sector": "manufacturing"
   }'
 ```
-
-#### Response
+ 
+**Response**
+ 
 ```json
 {
   "query": "Which companies have the strongest EBITDA margins and cash conversion?",
@@ -236,17 +228,17 @@ curl -X POST http://localhost:8000/query \
   "caveats": "Data sourced from public BSE/NSE filings as of FY24. All figures in INR Crores unless specified."
 }
 ```
-
-### Additional Endpoints
-- `GET /health`: Health and service availability status.
-- `GET /personas`: Lists available analyst personas and descriptions.
-- `GET /sectors`: Lists supported sectors, ticker coverage, and benchmark indices.
-- `GET /docs`: Interactive Swagger UI.
-
+ 
+### Other endpoints
+ 
+- `GET /health`, service status
+- `GET /personas`, lists the available personas
+- `GET /sectors`, lists supported sectors, tickers, and benchmark indices
+- `GET /docs`, Swagger UI
 ---
-
-## 📁 Repository Structure
-
+ 
+## Repository Structure
+ 
 ```text
 FinPrism/
 ├── .env.example              # Sample environment configuration
@@ -285,53 +277,52 @@ FinPrism/
 └── tests/                    # Verification & Sanity Checks
     └── test_evaluation_queries.py # Pytest test suite for personas & MCP
 ```
-
+ 
 ---
-
-## 📝 Design Notes (Assignment Write-Up)
-
-### 1. Schema Decisions
-The persistence layer uses a 4-table normalized SQLite schema designed to give the agent structured, multi-dimensional grounding without prompt hardcoding:
-* **`companies`**: Master record of static entity attributes (`id`, `name`, `ticker`, `sector`, `employee_count`, `headquarters`, `founding_year`, `business_description`). Normalizing static metadata eliminates redundant string storage across reporting periods.
-* **`financials`**: Multi-year time-series financial statements (`FY2023–FY2024`) containing Revenue, EBITDA, Net Income, Gross/EBITDA margins, P/E, EV/EBITDA, Debt/Equity, ROE, and Free Cash Flow. Multi-year reporting enables the Equity Analyst to examine margin trajectories and the PE Analyst to model cash flow stability.
-* **`sector_meta`**: Sector-level benchmark indices (e.g. *Nifty IT Index*, *Nifty India Consumption Index*, *Nifty India Manufacturing Index*) and sector peer averages. This is retrieved dynamically via MCP at query execution and injected into the prompt, ensuring benchmark comparisons reflect database ground truth.
-* **`news_signals`**: Event-driven signals categorized by type (`hiring`, `expansion`, `order_win`, `earnings_beat`). This directly supports data-grounding stress tests (e.g. headcount changes and strategic wins).
-
-**Key Considerations:**
-- **Unprofitable Companies**: Companies with negative earnings are stored with `pe_ratio = -1.0` (sentinel value) rather than `NULL` or 0, enabling the agent to distinguish between missing data and unprofitable growth names.
-- **Indian Market Representation**: All financial figures are denominated in **₹ Crores** (standard Indian corporate reporting standard), with numbers formatted in the Indian numbering system (`₹2,40,890 Cr`).
-- **Integrity Constraints**: DB-level `CHECK(sector IN ('tech', 'retail', 'manufacturing'))` prevents corrupted data entry.
-
+ 
+## Design Notes (Assignment Write-Up)
+ 
+### 1. Why the schema looks the way it does
+ 
+The database is split into four normalized tables, mostly so the agent has structured data to reason over instead of facts baked into a prompt.
+ 
+`companies` holds static attributes like name, ticker, sector, employee count, headquarters, founding year, and a short business description. Keeping this separate from the year-by-year numbers avoids repeating the same strings across every reporting period.
+ 
+`financials` covers FY23 and FY24: revenue, EBITDA, net income, gross and EBITDA margins, P/E, EV/EBITDA, debt to equity, ROE, and free cash flow. Having two years of data lets the equity analyst persona actually look at a margin trend instead of a single snapshot, and gives the PE analyst something to model cash flow stability against.
+ 
+`sector_meta` stores the benchmark index for each sector (Nifty IT, Nifty India Consumption, Nifty India Manufacturing) along with peer averages. This gets pulled in through MCP at query time, so benchmark comparisons are tied to what's actually in the database rather than something the model remembers.
+ 
+`news_signals` tracks event-driven items like hiring, expansion, order wins, and earnings beats. This is what lets the agent answer questions about headcount changes or recent strategic moves without needing a live news feed.
+ 
+A couple of smaller decisions worth flagging: companies with negative earnings get `pe_ratio = -1.0` instead of `NULL` or `0`, so the agent can tell the difference between "no data" and "unprofitable but growing." Everything is denominated in rupees crore, formatted the way Indian corporate filings actually format numbers (`₹2,40,890 Cr`). And there's a database-level check constraint on sector values so bad data can't sneak in.
+ 
+### 2. Why MCP sits between the agent and the database
+ 
+The main reason for using MCP here is to keep the agent from having any direct line into the database. `mcp_server/server.py` runs as its own OS process, and the agent talks to it only over stdin/stdout using JSON-RPC, through the official `mcp` SDK (`StdioServerParameters`, `stdio_client`, `ClientSession`). There's no shared Python import between the agent and the query layer, so the two can't drift into being coupled by accident.
+ 
+The server also doesn't expose a generic `execute_sql` tool. That's deliberate: an open SQL tool invites prompt injection, made-up schema queries, and full table scans nobody asked for. Instead there are five narrow tools:
+ 
+1. `get_sector_summary(sector)`, a macro view and benchmark multiples
+2. `list_companies(sector)`, a high-level screen of sector constituents
+3. `get_company_financials(company_name, sector)`, multi-year history with explicit `found: false` handling
+4. `search_companies(query, sector)`, fuzzy lookup by ticker or name
+5. `get_news_signals(company_name, sector)`, recent operational developments and headcount signals
+When the model fires off several tool calls at once, they get batched into a single MCP session (`call_tools_batch_sync`) rather than spinning up a new process for each one. And every tool call the agent makes during a query gets logged into `AgentResponse.tool_calls_made`, which is what shows up in the Streamlit UI's expandable MCP Tool Calls panel.
+ 
+### 3. What I'd build next if I had more time
+ 
+Right now the database is seeded once from FY24 filings, so it's a snapshot rather than something that stays current. Given more time, I'd wire up an ingestion pipeline against the NSE/BSE corporate filings APIs and something like Screener.in or Trendlyne, so quarterly results and disclosures get pulled in as they're released.
+ 
+I'd also want a vector index over earnings call transcripts and the MD&A sections of annual reports. That would let the mutual fund and PE personas quote actual management commentary alongside the balance sheet numbers, instead of relying on structured data alone.
+ 
 ---
-
-### 2. MCP Protocol Boundary Design
-Model Context Protocol (MCP) serves as the **strict architectural boundary** between the reasoning agent and data persistence:
-* **Subprocess Stdio Transport**: Rather than importing SQLite queries inline as Python modules, `mcp_server/server.py` runs as an isolated child OS process. The agent communicates strictly over standard input/output using the official `mcp` SDK's JSON-RPC protocol (`StdioServerParameters`, `stdio_client`, `ClientSession`). This guarantees zero code coupling between the agent runtime and the database layer.
-* **Semantic Scoped Tools vs. Generic SQL**:
-  Instead of exposing an open `execute_sql` tool (which risks prompt injection, hallucinated schema queries, and unconstrained table scans), FinPrism exposes 5 purpose-built semantic tools:
-  1. `get_sector_summary(sector)` — Macro overview and benchmark multiples.
-  2. `list_companies(sector)` — High-level sector constituent screen.
-  3. `get_company_financials(company_name, sector)` — Deep multi-year financial history with explicit `found: false` handling.
-  4. `search_companies(query, sector)` — Fuzzy ticker and company name lookup.
-  5. `get_news_signals(company_name, sector)` — Recent operational developments and headcount signals.
-* **Single-Session Batching**: Parallel tool requests generated by the LLM are batched within a single MCP session context (`call_tools_batch_sync`), minimizing process spawning overhead.
-* **Auditability & UI Transparency**: All MCP tool calls made during reasoning are recorded in `AgentResponse.tool_calls_made` and displayed in the Streamlit UI's expandable **🔧 MCP Tool Calls** panel.
-
----
-
-### 3. One Thing I'd Improve With More Time
-**Automated Real-Time Indian Exchange (NSE/BSE) API Ingestion**:
-Currently, the database is seeded from audited annual reports and filings as of FY24. With additional time, I would build an event-driven ingestion pipeline connecting directly to the **NSE/BSE Corporate Filings APIs** and **Screener.in / Trendlyne feeds**:
-* Automatically ingest quarterly results (Q1/Q2/Q3/Q4) and regulatory disclosures on release.
-* Implement a vector RAG index over conference call earnings transcripts and annual report MD&A sections. This would allow the Mutual Fund and PE analysts to cite verbatim management commentary alongside quantitative balance sheet metrics, marrying structured SQL data with unstructured sentiment.
-
----
-
-## 🧪 Evaluation & Verification
-
-A dedicated automated test suite validates database integrity, all 9 persona × sector permutations, out-of-scope refusal handling, and data grounding:
-
+ 
+## Evaluation and Verification
+ 
+There's a test suite that checks database integrity, all nine persona and sector combinations, refusal handling for out-of-scope questions, and whether answers are actually grounded in the data.
+ 
 ```bash
 python -m pytest tests/test_evaluation_queries.py -v
 ```
-All 4 test suites validate MCP tool schemas, multi-turn reasoning limits, and database query integrity without requiring live LLM API keys.
+ 
+The four test suites cover MCP tool schemas, multi-turn reasoning limits, and query integrity, and none of them need a live LLM API key to run.

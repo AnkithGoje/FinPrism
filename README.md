@@ -334,3 +334,4 @@ A dedicated automated test suite validates database integrity, all 9 persona × 
 ```bash
 python -m pytest tests/test_evaluation_queries.py -v
 ```
+All 4 test suites validate MCP tool schemas, multi-turn reasoning limits, and database query integrity without requiring live LLM API keys.

@@ -1,0 +1,22 @@
+# Core LLM & agent
+openai>=1.40.0
+
+# MCP protocol
+mcp>=1.0.0
+
+# API layer
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+
+# Validation
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# UI
+streamlit>=1.36.0
+
+# Utilities
+python-dotenv>=1.0.1
+
+# Data scraping / manipulation (for rebuild_db.py extensions)
+requests>=2.32.0

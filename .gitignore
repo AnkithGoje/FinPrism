@@ -1,0 +1,41 @@
+# Environment variables and API keys (CRITICAL - DO NOT COMMIT)
+.env
+.env.*
+!.env.example
+
+# SQLite Database files (reproducible via python db/build_db.py)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE and Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing, coverage & logs
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
